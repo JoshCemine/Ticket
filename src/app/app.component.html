@@ -1,5 +1,6 @@
 <dx-data-grid id="gridContainer" [dataSource]="dataSource" [showBorders]="true" [remoteOperations]="true"
-  (onEditorPreparing)="onEditorPreparing($event)" (onSelectionChanged)="onSelectionChanged($event)">
+  (onEditorPreparing)="onEditorPreparing($event)" (onContentReady)="onContentReady($event)"
+  (onSelectionChanged)="onSelectionChanged($event)">
 
   <!-- ////// -->
   <dxo-selection selectAllMode="page" showCheckBoxesMode="onClick" mode="multiple"></dxo-selection>

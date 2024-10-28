@@ -4,12 +4,10 @@ import { RouterOutlet } from '@angular/router';
 import { DxDataGridComponent, DxDataGridModule } from 'devextreme-angular';
 import { LoadOptions } from 'devextreme/data';
 import CustomStore from 'devextreme/data/custom_store';
-import dxDataGrid from 'devextreme/ui/data_grid';
 import { lastValueFrom } from 'rxjs';
 
 import dxCheckBox, {
   InitializedEvent,
-  ValueChangedEvent,
 } from 'devextreme/ui/check_box';
 
 
@@ -23,13 +21,9 @@ import dxCheckBox, {
 export class AppComponent {
   title = "DevExtreme"
 
-  ///
-  @ViewChild(DxDataGridComponent, { static: false }) dataGrid!: DxDataGridComponent;
-  selectAllCheckBox!: dxCheckBox;
-  checkBoxUpdating: boolean = false;
-  DISABLED_ITEMS = [35703, 35711, 35714, 38466, 38775];
-  SELECTABLE_ITEMS = []
-  //url: string;
+  @ViewChild(DxDataGridComponent, { static: false }) dataGrid!: DxDataGridComponent; //Gets the datagrid component
+  selectAllCheckBox!: dxCheckBox; //Gets the checkbox component
+  DISABLED_ITEMS = [35703, 35711, 35714, 38466, 38775]; //Example disabled items
 
   dataSource = {} as CustomStore;
 
@@ -73,42 +67,50 @@ export class AppComponent {
   }
 
 
-  //FOR DEBUG
-  ngOnInit() {
-    let filterArray: any = []
-    this.DISABLED_ITEMS.forEach((item, i) => {
-      filterArray.push(["OrderNumber", "<>", item])
-      if (i < this.DISABLED_ITEMS.length - 1) {
-        filterArray.push("and")
-      }
-    })
-    // console.log(filterArray)
-
-    this.dataSource.load({ filter: filterArray }).then((res: any) => this.SELECTABLE_ITEMS = res.data)
-
+  onContentReady(e: any) {
+    //When a new page is loaded and becomes ready, it updates the checkbox value here
+    this.selectAllCheckBox.option("value", this.isSelectAll())
   }
-
   getSelectableItems() {
     return this.dataGrid.instance.getVisibleRows().filter(item => !this.DISABLED_ITEMS.includes(item.key))
   }
-
-  isSelectAll(dataGrid: dxDataGrid) {
-    const selectedRowKeys = dataGrid.getSelectedRowKeys()
-    const selectableItems = this.getSelectableItems()
-
-    console.log("isSelectAll: SelectedRowKeys", selectedRowKeys)
-    console.log("isSelectAll: SelectableItems", selectableItems)
-
-    if (!selectedRowKeys?.length) {
-      console.log("isSelectAll", "false")
-      return false;
-    }
-    return selectedRowKeys.length >= selectableItems.length ? true : undefined;
-  };
-
   isSelectable(item: any) {
     return this.DISABLED_ITEMS.includes(item.OrderNumber)
   }
+
+  disableRows() {
+    //In this instance this function checks each selected row data. 
+    //If any of them are supposed to be deselected it deselects the data
+    const deselectRowKeys: number[] = [];
+    const dataGrid = this.dataGrid.instance
+
+    dataGrid.getSelectedRowsData().forEach((item: any) => {
+      if (this.isSelectable(item))
+        deselectRowKeys.push(dataGrid.keyOf(item));
+    });
+
+    if (deselectRowKeys.length) {
+      dataGrid.deselectRows(deselectRowKeys);
+    }
+  }
+
+  isSelectAll() {
+    //This function gets all the selected rows and the rows on the current page.
+    //It then filters to see which of these rows are not disabled.
+    //Then compares it with the number of selected rows on the current page that are not disabled.
+    //The result of this is then made into the value of the selectAllCheckbox
+    const selectedRowKeys = this.dataGrid.instance.getSelectedRowKeys()
+    const visibleKeys = this.dataGrid.instance.getVisibleRows().map(item => item.key)
+
+    const currentSelectableKeys = selectedRowKeys.filter(item => visibleKeys.includes(item))
+    const selectableItems = this.getSelectableItems()
+
+    if (!currentSelectableKeys?.length) {
+      console.log("isSelectAll", "false")
+      return false;
+    }
+    return currentSelectableKeys.length === selectableItems.length ? true : undefined;
+  };
 
   onEditorPreparing(e: any) {
     if (e.type !== 'selection') return;
@@ -119,61 +121,18 @@ export class AppComponent {
     if (e.parentType === 'headerRow') {
       console.log("HeaderRow", e)
       const dataGrid = e.component;
-      e.editorOptions.value = this.isSelectAll(dataGrid);
+      e.editorOptions.value = this.isSelectAll();
       e.editorOptions.onInitialized = (e: InitializedEvent) => {
         if (e.component) {
           console.log("SLCHKBX", e.component)
           this.selectAllCheckBox = e.component;
         }
       };
-      e.editorOptions.onValueChanged = (e: ValueChangedEvent) => {
-
-        if (!e.event) {
-          if (e.previousValue && !this.checkBoxUpdating) {
-            e.component.option('value', e.previousValue);
-          }
-          return;
-        }
-
-        if (this.isSelectAll(dataGrid) === e.value) {
-          return;
-        }
-
-        e.value ? dataGrid.selectAll() : dataGrid.deselectAll();
-        e.event.preventDefault();
-      };
     }
   }
 
   onSelectionChanged(e: any) {
-    const deselectRowKeys: number[] = [];
-    const dataGrid = e.component
-    console.log("ON SELECTION CHANGED", e)
-    console.log(this.selectAllCheckBox.option('value'))
-
-
-
-    e.selectedRowsData.forEach((item: any) => {
-      console.log("DSLTDRWKYS", deselectRowKeys)
-      if (this.isSelectable(item))
-        deselectRowKeys.push(dataGrid.keyOf(item));
-    });
-    if (deselectRowKeys.length) {
-      console.log("DSLTDRWKYS", deselectRowKeys)
-      dataGrid.deselectRows(deselectRowKeys);
-    }
-
-    console.log("WATATOP", e)
-    if (this.selectAllCheckBox.option('value') === false && e.selectedRowsData === this.getSelectableItems().length) {
-      this.dataGrid.instance.selectRows(e.selectedRowKeys, true)
-    }
-
-    this.checkBoxUpdating = true;
-    this.selectAllCheckBox.option('value', this.isSelectAll(dataGrid));
-    console.log("SLCTBXOPTNVLUE", this.selectAllCheckBox.option('value'))
-    console.log(this.selectAllCheckBox.option('value'))
-    this.checkBoxUpdating = false;
-
-    console.log("WOWOWOWODJAJIDBHUASHufAGSHJFHAIUJDB")
+    this.disableRows()
+    this.selectAllCheckBox.option('value', this.isSelectAll());
   }
 }
